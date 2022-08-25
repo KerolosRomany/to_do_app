@@ -1,375 +1,193 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:to_do_app/modules/add_task/add_task_screen.dart';
-class HomeLayout extends StatefulWidget {
-  const HomeLayout({Key? key}) : super(key: key);
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:to_do_app/shared/cubit/cubit.dart';
 
-  @override
-  State<HomeLayout> createState() => _HomeLayoutState();
-}
+import '../shared/components.dart';
+import '../modules/archieved/archieved_screen.dart';
+import '../modules/done/done_screen.dart';
+import '../modules/new_tasks/new_tasks_screen.dart';
+import '../shared/constants.dart';
+import '../shared/cubit/states.dart';
 
-class _HomeLayoutState extends State<HomeLayout> {
-  int currentIndex = 0;
-  bool checkBoxValue=false;
-  List<Widget> screens = [
+class HomeLayout extends StatelessWidget {
 
-  ];
 
-  List<String> titles = [
-    'New Tasks',
-    'Done Tasks',
-    'Archived Tasks',
-  ];
+
+  var scaffoldKey = GlobalKey<ScaffoldState>();
+  var formKey = GlobalKey<FormState>();
+
+  var titleController =TextEditingController();
+  var timeController =TextEditingController();
+  var dateController =TextEditingController();
+
+
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-       leading: IconButton(onPressed: (){},
-       icon: Icon(Icons.format_align_left),color: Colors.black),
-      backgroundColor: Colors.white,
-        elevation: 0,
-      ),
-      backgroundColor: Colors.white,
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.orange,
-        type: BottomNavigationBarType.fixed,
-        currentIndex: currentIndex,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.white70,
-        onTap: (index){
-          setState(() {
-            currentIndex=index;
-          });
-          print(index);
+    return BlocProvider(
+      create: (context) => AppCubit()..createDataBase(),
+      child: BlocConsumer<AppCubit,AppStates>(
+        listener: (context,state) {
+          if (state is AppInsertDatabaseState){
+            Navigator.pop(context);
+          }
         },
-        items: [
-          BottomNavigationBarItem(icon: Icon(Icons.check_circle_outline,),
-          label: 'Tasks',
-          ),
-          BottomNavigationBarItem(icon: IconButton(icon: Icon(Icons.add),onPressed: (){
-            setState(() {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => AddTaskScreen(currentIndex)));
-            });
-          }),
-          label: 'Add',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.settings,),
-          label: 'Settings',
-          ),
-
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(15.0),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                    children: [
-                      Container(
-                        width: 290,
-                        child: Text('Today',style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 30,
-                          fontWeight: FontWeight.bold),),
-                      ),
-                      CircleAvatar(
-                          child: IconButton(
-                            onPressed: (){
-                              setState(() {
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => AddTaskScreen(currentIndex)));
-                              });
-                            },
-                            icon: Icon(Icons.add),
-                            color: Colors.white,
-                          ),
-                        backgroundColor: Colors.orange,
-                      ),  //here you can add a task
-
-                    ],
-                  ),
+        builder:(context,state) {
+          AppCubit cubit = AppCubit.get(context);
+          return Scaffold(
+            key: scaffoldKey,
+            appBar: AppBar (
+              title: Text(
+                  cubit.titles[cubit.currentIndex]
               ),
-              Row(
-                  children: [
-                    Checkbox(value: checkBoxValue, onChanged:(bool? value){
-                      setState(() {
-                        checkBoxValue=value!;
-                      });
-                    },
-                      checkColor: Colors.white70,
-                      activeColor: Colors.orange,
-                    ),
-                    Container(
-                      width: 220,
-                        child: Text(
-                          'Wake up',
-                          style: TextStyle(
-                              fontSize: 20
+              centerTitle: true,
+              backgroundColor: Color(0xff004D40),
+            ),
+            bottomNavigationBar: BottomNavigationBar(
+              currentIndex: cubit.currentIndex,
+              type: BottomNavigationBarType.fixed,
+              selectedItemColor: Color(0xff004D40),
+              onTap: (index){
+                // setState(()
+                // {
+                //   currentIndex = index;
+                // }
+                // );
+                cubit.changeIndex(index);
+              },
+              items: [
+                BottomNavigationBarItem(icon: Icon(Icons.menu),label: 'Tasks'),
+                BottomNavigationBarItem(icon: Icon(Icons.check_circle_outlined,),
+                    label: 'Done'),
+                BottomNavigationBarItem(icon: Icon(Icons.archive_outlined),label: 'Archieved'),
+              ],
+            ),
+            floatingActionButton: FloatingActionButton(
+              backgroundColor: Color(0xff004D40),
+              onPressed: (){
+                if (cubit.isBottomSheetShow){
+                  if (formKey.currentState!.validate()){
+
+                    cubit.insertToDataBase(title: titleController.text,
+                        time: timeController.text,
+                        date: dateController.text);
+                        clearText(titleController);
+                        clearText(timeController);
+                        clearText(dateController);
+
+
+                  }
+                } else{
+                  scaffoldKey.currentState?.showBottomSheet((context)
+                  {
+                    return Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Container(
+                        color: Colors.grey[100],
+                        child: SingleChildScrollView(
+                          child: Form(
+                            key: formKey,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                defaultFormField(
+                                    controller: titleController,
+                                    type: TextInputType.text,
+                                    label_text: 'Title',
+                                    onTap: (){
+                                      print('Title is adding');
+                                    },
+                                    prefix_icon: Icons.title,
+                                    validate: (String? value)
+                                    {
+                                      if (value!.isEmpty) {
+                                        return 'title must not be empty';
+                                      }
+                                      return null;
+                                    }),
+                                SizedBox(
+                                  height: 15,
+                                ),
+                                defaultFormField(
+                                    controller: dateController,
+                                    type: TextInputType.datetime,
+                                    onTap: (){
+                                      showDatePicker(context: context,
+                                          initialDate: DateTime.now(),
+                                          firstDate: DateTime.now(),
+                                          lastDate: DateTime.parse('2022-12-31')).then((value) {
+                                        dateController.text = DateFormat.yMMMd().format(value!);
+                                      });
+                                    },
+                                    label_text: 'Date',
+                                    prefix_icon: Icons.calendar_today,
+                                    validate: (String? value)
+                                    {
+                                      if (value!.isEmpty) {
+                                        return 'Date must not be empty';
+                                      }
+                                      return null;
+                                    }),
+                                SizedBox(
+                                  height: 15,
+                                ),
+                                defaultFormField(
+                                    controller: timeController,
+                                    type: TextInputType.datetime,
+                                    onTap: (){
+                                      showTimePicker(context: context,
+                                          initialTime: TimeOfDay.now())
+                                          .then((value) {
+                                        timeController.text= value!.format(context).toString();
+                                        print(value.format(context));
+                                      });
+                                    },
+                                    label_text: 'Time',
+                                    prefix_icon: Icons.watch_later_outlined,
+                                    validate: (String? value)
+                                    {
+                                      if (value!.isEmpty) {
+                                        return 'Time must not be empty';
+                                      }
+                                      return null;
+                                    }),
+
+
+
+                              ],
+                            ),
                           ),
                         ),
-                    ),
-                    Text('06:00 AM',style: TextStyle(
-                        fontSize: 20
-                    ),)
-                  ],
-                ),
-              Row(
-                children: [
-                  Checkbox(value: checkBoxValue, onChanged:(bool? value){
-                    setState(() {
-                      checkBoxValue=value!;
-                    });
-                  },
-                    checkColor: Colors.white70,
-                    activeColor: Colors.orange,
-                  ),
-                  Container(
-                    width: 220,
-                    child: Text(
-                      'GYM',
-                      style: TextStyle(
-                          fontSize: 20
                       ),
-                    ),
-                  ),
-                  Text('06:30 AM',style: TextStyle(
-                      fontSize: 20
-                  ),)
-                ],
-              ),
-              Row(
-                children: [
-                  Checkbox(value: checkBoxValue, onChanged:(bool? value){
-                    setState(() {
-                      checkBoxValue=value!;
-                    });
-                  },
-                    checkColor: Colors.white70,
-                    activeColor: Colors.orange,
-                  ),
-                  Container(
-                    width: 220,
-                    child: Text(
-                      'Feed dog',
-                      style: TextStyle(
-                          fontSize: 20
-                      ),
-                    ),
-                  ),
-                  Text('08:00 AM',style: TextStyle(
-                      fontSize: 20
-                  ),)
-                ],
-              ),
-              Row(
-                children: [
-                  Checkbox(value: checkBoxValue, onChanged:(bool? value){
-                    setState(() {
-                      checkBoxValue=value!;
-                    });
-                  },
-                    checkColor: Colors.white70,
-                    activeColor: Colors.orange,
-                  ),
-                  Container(
-                    width: 220,
-                    child: Text(
-                      'Go to supermarket',
-                      style: TextStyle(
-                          fontSize: 20
-                      ),
-                    ),
-                  ),
-                  Text('05:00 PM',style: TextStyle(
-                      fontSize: 20
-                  ),)
-                ],
-              ),
-              Row(
-                children: [
-                  Checkbox(value: checkBoxValue, onChanged:(bool? value){
-                    setState(() {
-                      checkBoxValue=value!;
-                    });
-                  },
-                    checkColor: Colors.white70,
-                    activeColor: Colors.orange,
-                  ),
-                  Container(
-                    width: 220,
-                    child: Text(
-                      'Visit my friend',
-                      style: TextStyle(
-                          fontSize: 20
-                      ),
-                    ),
-                  ),
-                  Text('07:30 PM',style: TextStyle(
-                      fontSize: 20
-                  ),)
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 290,
-                      child: Text('Tomorrow',style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 30,
-                          fontWeight: FontWeight.bold),),
-                    ),
-                    CircleAvatar(
-                      child: IconButton(
-                        onPressed: (){
-                          setState(() {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => AddTaskScreen(currentIndex)));
-                          });
-                        },
-                        icon: Icon(Icons.add),
-                        color: Colors.white,
-                      ),
-                      backgroundColor: Colors.orange,
-                    ),  //here you can add a task
+                    );
+                  }).closed.then((value) {
+                    cubit.changeBottomSheetState(
+                        isShow:false ,
+                        icon: Icons.edit);
+                  });
+                  cubit.changeBottomSheetState(
+                      isShow:true,
+                      icon: Icons.add);
 
-                  ],
-                ),
-              ),
-              Row(
-                children: [
-                  Checkbox(value: checkBoxValue, onChanged:(bool? value){
-                    setState(() {
-                      checkBoxValue=value!;
-                    });
-                  },
-                    checkColor: Colors.white70,
-                    activeColor: Colors.orange,
-                  ),
-                  Container(
-                    width: 220,
-                    child: Text(
-                      'Wake up',
-                      style: TextStyle(
-                          fontSize: 20
-                      ),
-                    ),
-                  ),
-                  Text('06:00 AM',style: TextStyle(
-                      fontSize: 20
-                  ),)
-                ],
-              ),
-              Row(
-                children: [
-                  Checkbox(value: checkBoxValue, onChanged:(bool? value){
-                    setState(() {
-                      checkBoxValue=value!;
-                    });
-                  },
-                    checkColor: Colors.white70,
-                    activeColor: Colors.orange,
-                  ),
-                  Container(
-                    width: 220,
-                    child: Text(
-                      'GYM',
-                      style: TextStyle(
-                          fontSize: 20
-                      ),
-                    ),
-                  ),
-                  Text('06:30 AM',style: TextStyle(
-                      fontSize: 20
-                  ),)
-                ],
-              ),
-              Row(
-                children: [
-                  Checkbox(value: checkBoxValue, onChanged:(bool? value){
-                    setState(() {
-                      checkBoxValue=value!;
-                    });
-                  },
-                    checkColor: Colors.white70,
-                    activeColor: Colors.orange,
-                  ),
-                  Container(
-                    width: 220,
-                    child: Text(
-                      'Feed dog',
-                      style: TextStyle(
-                          fontSize: 20
-                      ),
-                    ),
-                  ),
-                  Text('08:00 AM',style: TextStyle(
-                      fontSize: 20
-                  ),)
-                ],
-              ),
-              Row(
-                children: [
-                  Checkbox(value: checkBoxValue, onChanged:(bool? value){
-                    setState(() {
-                      checkBoxValue=value!;
-                    });
-                  },
-                    checkColor: Colors.white70,
-                    activeColor: Colors.orange,
-                  ),
-                  Container(
-                    width: 220,
-                    child: Text(
-                      'Go to supermarket',
-                      style: TextStyle(
-                          fontSize: 20
-                      ),
-                    ),
-                  ),
-                  Text('05:00 PM',style: TextStyle(
-                      fontSize: 20
-                  ),)
-                ],
-              ),
-              Row(
-                children: [
-                  Checkbox(value: checkBoxValue, onChanged:(bool? value){
-                    setState(() {
-                      checkBoxValue=value!;
-                    });
-                  },
-                    checkColor: Colors.white70,
-                    activeColor: Colors.orange,
-                  ),
-                  Container(
-                    width: 220,
-                    child: Text(
-                      'Visit my friend',
-                      style: TextStyle(
-                          fontSize: 20
-                      ),
-                    ),
-                  ),
-                  Text('07:30 PM',style: TextStyle(
-                      fontSize: 20
-                  ),)
-                ],
-              ),
-
-            ],
-          ),
-        ),
+                }
+              },
+              child: Icon(cubit.fabIcon),
+            ),
+            body: state is! AppGetDatbaseLoadingState ?
+              cubit.screens[cubit.currentIndex] : Center(
+                child: CircularProgressIndicator()
+            )
+          );
+        }
       ),
     );
   }
 
-
-  Future<String> getName() async
-  {
-    return 'Kerolos Romany';
+  void clearText(TextEditingController controller) {
+    controller.clear();
   }
 }
